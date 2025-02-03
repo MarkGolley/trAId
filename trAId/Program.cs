@@ -1,34 +1,45 @@
-﻿using System;
-using System.Net.Http;
-using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
+using Timer = System.Timers.Timer;
 
 class Program
 {
+    private static Timer _timer;
+    private static List<string> _tickerSymbols = ["SMCI", "TSLA"];
+    
     static async Task Main(string[] args)
     {
+        _timer = new Timer(60000);
+        _timer.Elapsed += async (sender, e) => await FetchStockData();
+        _timer.Start();
+        
+        Console.WriteLine("Press Enter to exit...");
+        Console.ReadLine();
+    }
+
+    private static async Task FetchStockData()
+    {
         var apiKey = GetApiKey();
-        var tickerSymbol = "SMCI";
-        var url =  $"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol={tickerSymbol}&interval=5min&apikey={apiKey}";
-
-        using var client = new HttpClient();
-        try
+        foreach (var tickerSymbol in _tickerSymbols)
         {
-            Console.WriteLine("Fetching tickers...");
-            var response = await client.GetAsync(url);
-            response.EnsureSuccessStatusCode();
+            var url =  $"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol={tickerSymbol}&interval=5min&apikey={apiKey}";
 
-            var responseBody = await response.Content.ReadAsStringAsync();
-            var json = JObject.Parse(responseBody);
+            using var client = new HttpClient();
+            try
+            {
+                Console.WriteLine($"Fetching data for ticker...{tickerSymbol}");
+                var response = await client.GetAsync(url);
+                response.EnsureSuccessStatusCode();
 
-            ExtractDataAndPrint(json);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error fetching data: {ex.Message}");
+                var responseBody = await response.Content.ReadAsStringAsync();
+                ProcessData(responseBody);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching data: {ex.Message}");
+            }
         }
     }
-    
+
     private static string? GetApiKey()
     {
         try
@@ -44,8 +55,9 @@ class Program
         return null;
     }
     
-    private static void ExtractDataAndPrint(JObject json)
+    private static void ProcessData(string responseBody)
     {
+        var json = JObject.Parse(responseBody);
         var metaData = json["Meta Data"];
         var symbol = metaData["2. Symbol"].ToString();
         var lastRefreshed = metaData["3. Last Refreshed"].ToString();
@@ -66,5 +78,17 @@ class Program
         Console.WriteLine($"Low: {low}");
         Console.WriteLine($"Close: {close}");
         Console.WriteLine($"Volume: {volume}");
+
+        CheckAlerts(symbol, double.Parse(close));
+    }
+
+    private static void CheckAlerts(string symbol, double currentPrice)
+    {
+        var threshold = 150.0;
+
+        if (currentPrice > threshold)
+        {
+            Console.WriteLine($"ALERT: {symbol} price is above the threshold! Current price: {currentPrice}");
+        }
     }
 }
