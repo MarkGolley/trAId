@@ -1,0 +1,45 @@
+STOCK DATA:
+- Use an api to get live stock data in 
+
+STORAGE:
+- store owned stock data locally
+- store owned stock data remotely
+- store api stock data locally
+- store api stock data remotely
+- store interested stocks locally 
+- store interested stocks remotely
+
+- store user data so the app can handle more than one user
+
+UI:
+- Have a basic UI:
+    - for admin:
+        - add owned stocks
+        - edit owned stocks
+        - remove owned stocks
+        - show owned stocks
+    - for visuals:
+        - displaying trends
+        - displaying alerts
+        - displaying upcoming stock events
+            - and an explanation of the events
+        - display info about the stock that might be relevant
+    
+
+MONITORING:
+- display console/app alerts
+- send email alerts
+- send what's app alerts
+    AI Monitoring:
+    - have LLM observe trends and alert if change is needed on owned stocks
+    - have LLM observe trends and alert if purchase needed on interested stocks 
+    
+LLM/AI:
+- Send positions data and ???
+- can i use an api call with trading 212 to trigger the purchase or sale of stocks??
+- send progress to LLM for feedback, show feedback and show how the LLM rates you
+    - can it direct you to further reading in the areas you might need help
+
+DEPLOYMENT
+- Host the app on GCP so it runs all the time
+- Host the app on AWS for extra experience

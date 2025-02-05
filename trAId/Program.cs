@@ -1,32 +1,75 @@
 ﻿using Newtonsoft.Json.Linq;
+using trAId.Models;
+using trAId.Utils;
 using Timer = System.Timers.Timer;
 
 class Program
 {
     private static Timer _timer;
-    private static List<string> _tickerSymbols = ["SMCI", "TSLA"];
+    private static List<StockOwnership>? _stockOwnership;
     
     static async Task Main(string[] args)
     {
+        _stockOwnership = StockManager.LoadStocks();
+        
+        await FetchStockData();
+        StockMenuInteraction(_stockOwnership);
+
         _timer = new Timer(60000);
         _timer.Elapsed += async (sender, e) => await FetchStockData();
         _timer.Start();
         
         Console.WriteLine("Press Enter to exit...");
         Console.ReadLine();
+        StockManager.SaveStocks(_stockOwnership);
+    }
+
+    private static void StockMenuInteraction(List<StockOwnership> stocks)
+    {
+        bool exit = false;
+        while (!exit)
+        {
+            Console.WriteLine("\nStock Ownership Menu:");
+            Console.WriteLine("1. View Stocks");
+            Console.WriteLine("2. Add Stock");
+            Console.WriteLine("3. Remove Stock");
+            Console.WriteLine("4. Exit");
+            Console.Write("Choose an option: ");
+
+            var choice = Console.ReadLine();
+            switch (choice)
+            {
+                case "1":
+                    StockManager.ViewStocks(stocks);
+                    break;
+                case "2":
+                    StockManager.AddStock(stocks);
+                    break;
+                case "3":
+                    StockManager.RemoveStock(stocks);
+                    break;
+                case "4":
+                    StockManager.SaveStocks(stocks);
+                    exit = true;
+                    break;
+                default:
+                    Console.WriteLine("Invalid choice. Please try again.");
+                    break;
+            }
+        }
     }
 
     private static async Task FetchStockData()
     {
-        var apiKey = GetApiKey();
-        foreach (var tickerSymbol in _tickerSymbols)
+        var apiKey = ApiKey.GetApiKey();
+        foreach (var stock in _stockOwnership)
         {
-            var url =  $"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol={tickerSymbol}&interval=5min&apikey={apiKey}";
+            var url =  $"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol={stock.Symbol}&interval=5min&apikey={apiKey}";
 
             using var client = new HttpClient();
             try
             {
-                Console.WriteLine($"Fetching data for ticker...{tickerSymbol}");
+                Console.WriteLine($"Fetching data for ticker...{stock}");
                 var response = await client.GetAsync(url);
                 response.EnsureSuccessStatusCode();
 
@@ -40,21 +83,6 @@ class Program
         }
     }
 
-    private static string? GetApiKey()
-    {
-        try
-        {
-            var json = File.ReadAllText("C:\\Users\\markg\\RiderProjects\\trAId\\trAId\\appsettings.json");
-            var config = JObject.Parse(json);
-            return config["AlphaVantageApiKey"]?.ToString();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error reading appsettings.json: {ex.Message}");
-        }
-        return null;
-    }
-    
     private static void ProcessData(string responseBody)
     {
         var json = JObject.Parse(responseBody);
@@ -84,11 +112,26 @@ class Program
 
     private static void CheckAlerts(string symbol, double currentPrice)
     {
-        var threshold = 150.0;
-
-        if (currentPrice > threshold)
+        var stock = _stockOwnership.FirstOrDefault(s => s.Symbol == symbol);
+        
+        if (stock != null)
         {
-            Console.WriteLine($"ALERT: {symbol} price is above the threshold! Current price: {currentPrice}");
+            double? gainPercentage = (currentPrice - stock.PurchasePrice) / stock.PurchasePrice * 100;
+            Console.WriteLine($"ALERT: {symbol} is up by {gainPercentage:F2}% from your purchase price!");
+
+            if (currentPrice > stock.StockGoals.TargetPrice)
+            {
+                Console.WriteLine($"Sell alert: {symbol} has reached the target price of {stock.StockGoals.TargetPrice}. Consider selling or increase target price!");
+            }
+            
+            if (gainPercentage >= 10)
+            {
+                Console.WriteLine($"Sell alert: {symbol} has gained 10% or more!");
+            }
+            else if (gainPercentage <= -5)
+            {
+                Console.WriteLine($"Loss alert: {symbol} has dropped by 5% or more!");
+            }
         }
     }
 }
